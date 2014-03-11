@@ -27,10 +27,6 @@
 	function UTCDate(){
 		return new Date(Date.UTC.apply(Date, arguments));
 	}
-	function UTCToday(){
-		var today = new Date();
-		return UTCDate(today.getFullYear(), today.getMonth(), today.getDate());
-	}
 	function alias(method){
 		return function(){
 			return this[method].apply(this, arguments);
@@ -85,10 +81,10 @@
 
 	var Datepicker = function(element, options){
 		this.dates = new DateArray();
-		this.viewDate = UTCToday();
 		this.focusDate = null;
 
 		this._process_options(options);
+        this.viewDate = this.UTCToday();
 
 		this.element = $(element);
 		this.isInline = false;
@@ -206,7 +202,7 @@
 					if (o.startDate instanceof Date)
 						o.startDate = this._local_to_utc(this._zero_time(o.startDate));
 					else
-						o.startDate = DPGlobal.parseDate(o.startDate, format, o.language);
+						o.startDate = DPGlobal.parseDate(o.startDate, format, o.language, o.getNow);
 				}
 				else {
 					o.startDate = -Infinity;
@@ -217,7 +213,7 @@
 					if (o.endDate instanceof Date)
 						o.endDate = this._local_to_utc(this._zero_time(o.endDate));
 					else
-						o.endDate = DPGlobal.parseDate(o.endDate, format, o.language);
+						o.endDate = DPGlobal.parseDate(o.endDate, format, o.language, o.getNow);
 				}
 				else {
 					o.endDate = Infinity;
@@ -630,7 +626,7 @@
 			}
 
 			dates = $.map(dates, $.proxy(function(date){
-				return DPGlobal.parseDate(date, this.o.format, this.o.language);
+				return DPGlobal.parseDate(date, this.o.format, this.o.language, this.o.getNow);
 			}, this));
 			dates = $.grep(dates, $.proxy(function(date){
 				return (
@@ -701,7 +697,7 @@
 			var cls = [],
 				year = this.viewDate.getUTCFullYear(),
 				month = this.viewDate.getUTCMonth(),
-				today = new Date();
+				today = this.o.getNow();
 			if (date.getUTCFullYear() < year || (date.getUTCFullYear() === year && date.getUTCMonth() < month)){
 				cls.push('old');
 			}
@@ -929,7 +925,7 @@
 								this.fill();
 								break;
 							case 'today':
-								var date = new Date();
+								var date = this.o.getNow();
 								date = UTCDate(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0);
 
 								this.showMode(-2);
@@ -1110,6 +1106,11 @@
 			return date >= this.o.startDate && date <= this.o.endDate;
 		},
 
+        UTCToday: function(){
+            var today = this.o.getNow();
+            return UTCDate(today.getFullYear(), today.getMonth(), today.getDate());
+        },
+
 		keydown: function(e){
 			if (this.picker.is(':not(:visible)')){
 				if (e.keyCode === 27) // allow escape to hide and re-show picker
@@ -1136,17 +1137,17 @@
 						break;
 					dir = e.keyCode === 37 ? -1 : 1;
 					if (e.ctrlKey){
-						newDate = this.moveYear(this.dates.get(-1) || UTCToday(), dir);
+						newDate = this.moveYear(this.dates.get(-1) || this.UTCToday(), dir);
 						newViewDate = this.moveYear(focusDate, dir);
 						this._trigger('changeYear', this.viewDate);
 					}
 					else if (e.shiftKey){
-						newDate = this.moveMonth(this.dates.get(-1) || UTCToday(), dir);
+						newDate = this.moveMonth(this.dates.get(-1) || this.UTCToday(), dir);
 						newViewDate = this.moveMonth(focusDate, dir);
 						this._trigger('changeMonth', this.viewDate);
 					}
 					else {
-						newDate = new Date(this.dates.get(-1) || UTCToday());
+						newDate = new Date(this.dates.get(-1) || this.UTCToday());
 						newDate.setUTCDate(newDate.getUTCDate() + dir);
 						newViewDate = new Date(focusDate);
 						newViewDate.setUTCDate(focusDate.getUTCDate() + dir);
@@ -1164,17 +1165,17 @@
 						break;
 					dir = e.keyCode === 38 ? -1 : 1;
 					if (e.ctrlKey){
-						newDate = this.moveYear(this.dates.get(-1) || UTCToday(), dir);
+						newDate = this.moveYear(this.dates.get(-1) || this.UTCToday(), dir);
 						newViewDate = this.moveYear(focusDate, dir);
 						this._trigger('changeYear', this.viewDate);
 					}
 					else if (e.shiftKey){
-						newDate = this.moveMonth(this.dates.get(-1) || UTCToday(), dir);
+						newDate = this.moveMonth(this.dates.get(-1) || this.UTCToday(), dir);
 						newViewDate = this.moveMonth(focusDate, dir);
 						this._trigger('changeMonth', this.viewDate);
 					}
 					else {
-						newDate = new Date(this.dates.get(-1) || UTCToday());
+						newDate = new Date(this.dates.get(-1) || this.UTCToday());
 						newDate.setUTCDate(newDate.getUTCDate() + dir * 7);
 						newViewDate = new Date(focusDate);
 						newViewDate.setUTCDate(focusDate.getUTCDate() + dir * 7);
@@ -1408,6 +1409,7 @@
 		startView: 0,
 		todayBtn: false,
 		todayHighlight: false,
+        getNow: function() {return new Date();},
 		weekStart: 0
 	};
 	var locale_opts = $.fn.datepicker.locale_opts = [
@@ -1463,7 +1465,7 @@
 			}
 			return {separators: separators, parts: parts};
 		},
-		parseDate: function(date, format, language){
+		parseDate: function(date, format, language, getNow){
 			if (!date)
 				return undefined;
 			if (date instanceof Date)
@@ -1474,7 +1476,7 @@
 				parts = date.match(/([\-+]\d+)([dmwy])/g),
 				part, dir, i;
 			if (/^[\-+]\d+[dmwy]([\s,]+[\-+]\d+[dmwy])*$/.test(date)){
-				date = new Date();
+				date = getNow();
 				for (i=0; i < parts.length; i++){
 					part = part_re.exec(parts[i]);
 					dir = parseInt(part[1]);
@@ -1496,7 +1498,7 @@
 				return UTCDate(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0);
 			}
 			parts = date && date.match(this.nonpunctuation) || [];
-			date = new Date();
+			date = getNow();
 			var parsed = {},
 				setters_order = ['yyyy', 'yy', 'M', 'MM', 'm', 'mm', 'd', 'dd'],
 				setters_map = {
